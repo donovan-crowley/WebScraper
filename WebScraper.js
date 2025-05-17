@@ -28,7 +28,7 @@ const cheerio = require("cheerio");
 
 
     const $ = cheerio.load(pageData.html);
-    const elementPrice = $(".money");
+    const element = $(".money");
 
     console.log(element.text());
 
