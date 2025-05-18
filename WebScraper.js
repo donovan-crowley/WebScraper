@@ -5,13 +5,22 @@ const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
 
 const WEATHERHOME_URL = "https://weather.com/weather/tenday/l/6594bd988ad8d62279951252d2be55f03043bee93ced5605230072de15a4c00e";
+const QUOTE_URL = "https://inspiringquotes.com/";
 
 (async () =>{
     try{
         const {browser, page} = await launchBrowser();
-        const html = await getPageHTML(page, WEATHERHOME_URL);
-        const weatherData = parseWeatherData(html);
+
+        // Weather
+        const weatherHTML = await getPageHTML(page, WEATHERHOME_URL);
+        const weatherData = parseWeatherData(weatherHTML);
         displayWeatherToday(weatherData);
+
+        // Quote of the Day
+        const quoteHTML = await getPageHTML(page, QUOTE_URL);
+        const quoteData = parseQuoteData(quoteHTML);
+        displayQuote(quoteData);
+
         await browser.close();
     } catch(error){
         console.error("An error has occured: ", error);
@@ -38,5 +47,16 @@ function parseWeatherData(html){
 }
 
 function displayWeatherToday({today, forecast}){
-    console.log(`Today ${today}: ${forecast}`)
+    console.log(`Weather Today ${today}: ${forecast}`)
+}
+
+function parseQuoteData(html){
+    const $ = cheerio.load(html);
+    const quoteText = $(".quote-card__quote").first().text();
+    const author = $(".quote-card__author").first().text();
+    return { quoteText, author };
+}
+
+function displayQuote({ quoteText, author }){
+    console.log(`"${quoteText}"\n - ${author}`);
 }
