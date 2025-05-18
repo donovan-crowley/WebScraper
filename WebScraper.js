@@ -4,33 +4,41 @@
 const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
 
+const WEATHER_URL = "https://weather.com/weather/tenday/l/6594bd988ad8d62279951252d2be55f03043bee93ced5605230072de15a4c00e";
 
 (async () =>{
-    const browser = await puppeteer.launch({
-        defaultViewport: {
-            width: 500,
-            height: 500,
-        },
-    });
-    const page = await browser.newPage();
-    await page.goto("https://craftdlondon.com/products/connell-silver-2mm?variant=32424252080210");
-
-    /*await page.screenshot({path: "image.png"})*/
-
-    const pageData = await page.evaluate(() =>{
-        return{
-            html: document.documentElement.innerHTML,
-            width: document.documentElement.clientWidth,
-            height: document.documentElement.clientHeight,
-        };
-    });
-
-
-
-    const $ = cheerio.load(pageData.html);
-    const element = $(".money");
-
-    console.log(element.text());
-
-    await browser.close();
+    try{
+        const {browser, page} = await launchBrowser();
+        const html = await getPageHTML(page, WEATHER_URL);
+        const weatherData = parseWeatherData(html);
+        displayWeather(weatherData);
+        await browser.close();
+    } catch(error){
+        console.error("An error has occured: ", error);
+    }
 })();
+
+async function launchBrowser(){
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    return { browser, page };
+}
+
+async function getPageHTML(page, url){
+    await page.goto(url, {waitUntil: "networkidle2"});
+    const html = await page.evaluate(() => document.documentElement.innerHTML);
+    return html;
+}
+
+function parseWeatherData(html){
+    const $ = cheerio.load(html);
+    const dates = $(".DailyContent--daypartDate--KXrEE").map((i, el) => $(el).text()).get();
+    const forecasts = $(".DailyContent--narrative--jqi6P").map((i, el) => $(el).text()).get();
+    return {dates, forecasts};
+}
+
+function displayWeather({dates, forecasts}){
+    for(let i = 0; i < Math.min(dates.length, forecasts.length); i++){
+        console.log(`${dates[i]}: ${forecasts[i]}`);
+    }
+}
