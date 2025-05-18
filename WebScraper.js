@@ -4,14 +4,14 @@
 const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
 
-const WEATHER_URL = "https://weather.com/weather/tenday/l/6594bd988ad8d62279951252d2be55f03043bee93ced5605230072de15a4c00e";
+const WEATHERHOME_URL = "https://weather.com/weather/tenday/l/6594bd988ad8d62279951252d2be55f03043bee93ced5605230072de15a4c00e";
 
 (async () =>{
     try{
         const {browser, page} = await launchBrowser();
-        const html = await getPageHTML(page, WEATHER_URL);
+        const html = await getPageHTML(page, WEATHERHOME_URL);
         const weatherData = parseWeatherData(html);
-        displayWeather(weatherData);
+        displayWeatherToday(weatherData);
         await browser.close();
     } catch(error){
         console.error("An error has occured: ", error);
@@ -32,13 +32,11 @@ async function getPageHTML(page, url){
 
 function parseWeatherData(html){
     const $ = cheerio.load(html);
-    const dates = $(".DailyContent--daypartDate--KXrEE").map((i, el) => $(el).text()).get();
-    const forecasts = $(".DailyContent--narrative--jqi6P").map((i, el) => $(el).text()).get();
-    return {dates, forecasts};
+    const today = $(".DailyContent--daypartDate--KXrEE").first().text();
+    const forecast = $(".DailyContent--narrative--jqi6P").first().text();
+    return {today, forecast};
 }
 
-function displayWeather({dates, forecasts}){
-    for(let i = 0; i < Math.min(dates.length, forecasts.length); i++){
-        console.log(`${dates[i]}: ${forecasts[i]}`);
-    }
+function displayWeatherToday({today, forecast}){
+    console.log(`Today ${today}: ${forecast}`)
 }
