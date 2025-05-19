@@ -1,14 +1,17 @@
 // May 19, 2025
 // Code Developed by Donovan Crowley
 
-const cheerio = require('cheerio');
-const puppeteer = require('puppeteer');
+// Testcase 1: Case Western Reserve University -> Carnegie Mellon University
+// Testcase 2: Case Western Reserve University -> Cleveland Browns -> Egypt
+// Testcase 3: Great Gatsby -> ... (I forgot the "The", so the code could not find the next page)
+// Testcase 4: The Great Gatsby -> Daisy Buchanan
+// Testcase 5: Freddie Mercury -> Eric Idle -> Holy Grail
+
+const axios = require("axios");
 
 (async () => {
-    const start = "Case Western Reserve University";
-    const end = "Egypt";
-
-    const path = await shortestPath(start, end);
+    // Start -> End
+    const path = await shortestPath("The Great Gatsby", "Daisy Buchanan");
     if(path){
         console.log("Found Path: ");
         console.log(path.join(" -> "));
@@ -17,64 +20,67 @@ const puppeteer = require('puppeteer');
     }
 })();
 
-// Bread-First Search
+// Bread-First search, treating links as nodes, to find the shortest path searching each level of the tree
 async function shortestPath(start, end){
-    const browser = await puppeteer.launch({
-        headless: "new"
-    });
     const visited = new Set();
     const queue = [[start]];
+    const cache = new Map();
 
+    // Use queue for BFS
     while(queue.length > 0){
         const path = queue.shift();
         const current = path[path.length - 1];
 
+        // Eliminate duplicate links
         if(visited.has(current)){
             continue;
         }
-        visited.add(current);
 
         console.log(`Visited: ${current}`);
+        visited.add(current);
 
+        // Found the correct link
         if(current == end){
-            await browser.close();
             return path;
         }
-        try{
-            const links = await getLinks(current, browser);
-            for(let next of links){
-                if(!visited.has(next)){
-                    queue.push([...path, next]);
-                }
-            }
-        } catch (error) {
-            console.error(`Error processing ${current}`, error);
-        }        
-    }
 
-    await browser.close();
+        // All the links (or children) on each page
+        const links = await getLinks(current, cache);
+
+        // Add all the new possible paths
+        for(let next of links){
+            if(!visited.has(next)){
+                queue.push([...path, next]);
+            }
+        }    
+    }
     return null;
 }
 
-async function getLinks(title, browser){
-    const page = await browser.newPage();
-    const url = `https://en.wikipedia.org/wiki/${title}`;
-    await page.goto(url, {waitUntil: "networkidle2"});
+async function getLinks(title, cache){
+    // Eliminate Duplicate API calls in cache
+    if(cache.has(title)){
+        return cache.get(title);
+    }
 
-    const html = await page.content();
-    const $ = cheerio.load(html);
+    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=links&pllimit=max&format=json&origin=*`;
+    let links = [];
 
-    const links = new Set();
+    try{
+        const response = await axios.get(url);
+        const pages = response.data.query.pages;
 
-    // Ensure the links are internal
-    $('#bodyContent a[href^="/wiki/"]').each((i, elem) =>{
-        const href = $(elem).attr('href');
-        if(href && !href.includes(':')){
-            const title = decodeURIComponent(href.replace('/wiki/', '')).replace(/_/g, ' ');
-            links.add(title);
+        // Extract all of the links
+        for(let pageId in pages){
+            const page = pages[pageId];
+            if(page.links){
+                links = page.links.map(link => link.title);
+            }
         }
-    })
+    } catch (error){
+        console.error(`Error processing ${title}:`, error);
+    }
 
-    await page.close();
-    return Array.from(links);
+    cache.set(title, links);
+    return links;
 }
