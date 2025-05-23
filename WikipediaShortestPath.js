@@ -1,11 +1,17 @@
 // May 19, 2025
 // Code Developed by Donovan Crowley
 
-// Testcase 1: Case Western Reserve University -> Carnegie Mellon University
-// Testcase 2: Case Western Reserve University -> Cleveland Browns -> Egypt
-// Testcase 3: Great Gatsby -> ... (I forgot the "The", so the code could not find the next page)
-// Testcase 4: The Great Gatsby -> Daisy Buchanan
-// Testcase 5: Freddie Mercury -> Eric Idle -> Holy Grail
+// Testcase 1: Case Western Reserve University -> Cleveland Browns -> Egypt
+// Testcase 2: Great Gatsby -> ... (I forgot the "The", so the code could not find the next page)
+// Testcase 3: The Great Gatsby -> Daisy Buchanan
+// Testcase 4: Freddie Mercury -> Eric Idle -> Holy Grail
+
+
+// Gather all of the links on a page
+// Generate tensors for all the links and the goal using some basic encoder
+// Cosine Similarity to find the closest link
+
+// Get all links -> embed links -> cosine similarity -> choose best
 
 const axios = require("axios");
 
@@ -31,7 +37,7 @@ async function shortestPath(start, end){
         const path = queue.shift();
         const current = path[path.length - 1];
 
-        // Eliminate duplicate links
+        // Ignore duplicate links
         if(visited.has(current)){
             continue;
         }
@@ -49,12 +55,13 @@ async function shortestPath(start, end){
 
         // Add all the new possible paths
         for(let next of links){
+            console.log(`Visited: ${next}`);
             if(!visited.has(next)){
                 queue.push([...path, next]);
             }
-        }    
+        }
     }
-    return null;
+    return false;
 }
 
 async function getLinks(title, cache){
