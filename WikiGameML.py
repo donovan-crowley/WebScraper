@@ -4,9 +4,11 @@ Developed by Donovan Crowley
 """
 
 import requests
-import math
+from sentence_transformers import SentenceTransformer
 import heapq
 import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def getLinks(title):
     url = f"https://en.wikipedia.org/w/api.php?action=query&titles={title}&prop=links&pllimit=max&format=json&origin=*"
@@ -20,15 +22,8 @@ def getLinks(title):
         print(f"Error getting links for {title}: {e}")
         return []
 
-def toToken(word):
-    return word.lower().split()
-
-def embed(input):
-    words = toToken(input)
-    freq = {}
-    for word in words:
-        freq[word] = freq.get(word, 0) + 1
-    return freq
+def embed(word):
+    return model.encode(word)
 
 def cosineSimilarity(vec1, vec2):
     dot_product = sum(a * b for a, b in zip(vec1, vec2))
