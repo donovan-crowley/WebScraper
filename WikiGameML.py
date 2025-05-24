@@ -7,7 +7,9 @@ Developed by Donovan Crowley
 # Testcase 2: The Great Gatsby -> Associated Press -> Rome
 # Testcase 3: Great Gatsby -> The Great Gatsby -> Daisy Buchanan
 # Testcase 4: Marrige -> Hangman (This ran for an hour because Hangman is ambiguous)
-# Testcase 5: Toy -> Poetry
+# Testcase 5: Toy -> Wikipedia:WikiProject Countering systemic bias -> Religious text
+# Testcase 6: Toy -> Age of Enlightenment -> Religious text
+
 
 import requests
 from sentence_transformers import SentenceTransformer
@@ -15,34 +17,64 @@ import heapq
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
+embed_cache = {}
+link_cache = {}
+
 def getLinks(title):
+    if title in link_cache:
+        return link_cache[title]
+
     # Visit API and gather links on the page
-    url = f"https://en.wikipedia.org/w/api.php?action=query&titles={title}&prop=links&pllimit=max&format=json&origin=*"
-    try:
-        response = requests.get(url).json()
+    url = "https://en.wikipedia.org/w/api.php"
+    params = { "action": "query",
+        "titles": title,
+        "prop": "links",
+        "pllimit": "max",
+        "format": "json",
+        "origin": "*"
+    }
+    all_links = []
+    while True:
+        response = requests.get(url, params=params).json()
         pages = response['query']['pages']
         for page_id in pages:
             links = pages[page_id].get('links', [])
-            return [link['title'] for link in links]
-    except Exception as e:
-        print(f"Error getting links for {title}: {e}")
-        return []
+            all_links.extend(link['title'] for link in links)
+        
+        if "continue" in response:
+            params.update(response["continue"])
+        else:
+            break
+    filter_links = filter(all_links)
+    link_cache[title] = filter_links
+    return filter_links
 
-def embed(word):
-    return model.encode(word) # Use pretrained sentence transformers LM
+
+def filter(links):
+    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:")
+    return [link for link in links if not link.startswith(ignore)]
+
+
+def embed(title):
+    if title in embed_cache:
+        return embed_cache[title]
+    vec = model.encode([title])[0]
+    embed_cache[title] = vec
+    return vec
 
 def cosineSimilarity(vec1, vec2):
     dot_product = sum(a * b for a, b in zip(vec1, vec2))
     mag1 = pow(sum(pow(a, 2) for a in vec1), 0.5)
     mag2 = pow(sum(pow(b, 2) for b in vec2), 0.5)
-    return dot_product / (mag1 * mag2) if mag1 and mag2 else 0
+    if mag1 and mag2:
+        return dot_product / (mag1 * mag2)
+    else:
+        return 0
 
-def a_star_search(start, end):
+def a_star_search(start, end, max_depth = 5):
     priority_queue = [(0, 0, [start])]
-    goal_embedding = embed([end])[0]
-    print(goal_embedding)
+    goal_embedding = embed(end)
     visited = set()
-    cache = {}
 
     while priority_queue:
         total, cost, path = heapq.heappop(priority_queue)
@@ -56,27 +88,28 @@ def a_star_search(start, end):
 
         if current == end:
             return path
+        
+        if cost > max_depth:
+            continue
 
-        if current not in cache:
-            cache[current] = getLinks(current)
-
-        next = cache[current]
+        next = getLinks(current)
 
         if not next:
             continue
 
-        next_embeddings = embed(next)
+        next_embeddings = model.encode(next)
 
         for neighbor, neighbor_vec in zip(next, next_embeddings):
-            if neighbor in visited:
-                continue
-            # Compare the goal link with the links on the page
-            heuristic = 1 - cosineSimilarity(goal_embedding, neighbor_vec)
-            heapq.heappush(priority_queue, (cost + 1 + heuristic, cost + 1, path + [neighbor]))
+            if neighbor not in visited:
+                embed_cache[neighbor] = neighbor_vec
+                # Compare the goal link with the links on the page (lower is closer)
+                heuristic = 1 - cosineSimilarity(goal_embedding, neighbor_vec)
+                heapq.heappush(priority_queue, (cost + 1 + heuristic, cost + 1, path + [neighbor]))
+
     return False
 
 if __name__ == "__main__":
-    path = a_star_search("Toy", "Poetry")
+    path = a_star_search("Pangaea", "Hammer", max_depth=6)
     if path:
         print("Found Path: ")
         print(" -> ".join(path))
