@@ -6,13 +6,6 @@
 // Testcase 3: The Great Gatsby -> Daisy Buchanan
 // Testcase 4: Freddie Mercury -> Eric Idle -> Holy Grail
 
-
-// Gather all of the links on a page
-// Generate tensors for all the links and the goal using some basic encoder
-// Cosine Similarity to find the closest link
-
-// Get all links -> embed links -> cosine similarity -> choose best
-
 const axios = require("axios");
 
 (async () => {
