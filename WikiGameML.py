@@ -63,7 +63,7 @@ def getLinks(title):
     return filtered
 
 def filter(links):
-    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:", "User talk:", "Module:", "User:", "File:", "Wikipedia talk: ", "Template talk:")
+    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:", "User talk:", "Module:", "User:", "File:", "Wikipedia talk: ", "Template talk:", "MOS:")
     filteredLinks = []
     for link in links:
         if not link.startswith(ignore):
@@ -86,64 +86,75 @@ def cosineSimilarity(vec1, vec2):
     else:
         return 0
 
-def a_star_search(start, end, max_depth = 5, top_k = 10):
+def a_star_search(start, end):
     priority_queue = [(0, 0, [start])]
     goal_embedding = embed(end)
     visited = set()
 
     while priority_queue:
-        total, cost, path = heapq.heappop(priority_queue)
+        # Guess next link at top of min-heap
+        priority, cost, path = heapq.heappop(priority_queue)
         current = path[-1]
 
+        # Skip if visited
         if current in visited:
             continue
 
         visited.add(current)
         print(f"Visited: {current}")
 
+        # Return the correct path to end page
         if current == end:
             return path
         
-        if cost >= max_depth:
+        # Prevent deep searches
+        if cost >= 6:
             continue
 
+        # Explore guess
         next = getLinks(current)
         if not next:
             continue
 
-        vectors = model.encode(next, batch_size = 32, show_progress_bar = False)
+        # Embed links
+        link_vectors = model.encode(next, batch_size = 32)
+
+        # Calculate similarity
         scored = []
-        for neighbor, vec in zip(next, vectors):
+        for neighbor, vec in zip(next, link_vectors):
             sim = cosineSimilarity(goal_embedding, vec)
             scored.append((neighbor, vec, sim))
-        scored.sort(key = lambda x: -x[2])
-        top_neighbors = scored[:top_k]
+        
+        # Sort the links and cutoff irrelevant ones
+        most_similar = sorted(scored, key = lambda x: -x[2])[:10] # Only top 10
 
-        for neighbor, vec, sim in top_neighbors:
-            if neighbor in visited:
-                continue
-
-            embed_cache[neighbor] = embed_cache.get(neighbor, vec)
-            heuristic = 1 - sim
-            heapq.heappush(priority_queue, (cost + 1 + heuristic, cost + 1, path + [neighbor]))
-
+        for neighbor, vec, sim in most_similar:
+            if neighbor not in visited:
+                embed_cache[neighbor] = embed_cache.get(neighbor, vec)
+                heuristic = 1 - sim # Lower is closer
+                heapq.heappush(priority_queue, (cost + 1 + heuristic, cost + 1, path + [neighbor]))
     return False
 
 if __name__ == "__main__":
     start = input("Start Wiki page title: ")
     end = input("End Wiki page title: ")
 
+    # Ensure the pages API exist
     wiki_api = wikipediaapi.Wikipedia(user_agent = 'WikiGameML.py', language = 'en')
     start_page = wiki_api.page(start)
     end_page = wiki_api.page(end)
     
+    # Start the timer
     start_time = time.time()
 
     if(start_page.exists() and end_page.exists()):
-        path = a_star_search(start, end, max_depth = 6, top_k = 10)
+        path = a_star_search(start, end)
         if path:
+            # Print shortest path
             print("Found Path: ")
             print(" -> ".join(path))
+
+            # Print the time it took for the algorithm to find the path
             end_time = time.time()
             difference = end_time - start_time
             print(f"Found in {difference:.2f} seconds")
