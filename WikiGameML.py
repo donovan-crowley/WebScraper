@@ -6,9 +6,16 @@ Developed by Donovan Crowley
 # Testcase 1: The Great Gatsby -> Daisy Buchanan
 # Testcase 2: The Great Gatsby -> Associated Press -> Rome
 # Testcase 3: Great Gatsby -> The Great Gatsby -> Daisy Buchanan
-# Testcase 4: Marrige -> Hangman (This ran for an hour because Hangman is ambiguous)
+# Testcase 4: Marrige -> ... -> Hangman (This ran for an hour because Hangman is ambiguous and could not be found)
 # Testcase 5: Toy -> Wikipedia:WikiProject Countering systemic bias -> Religious text
-# Testcase 6: Toy -> Age of Enlightenment -> Religious text
+# Testcase 6: Toy -> Age of Enlightenment -> Religious text (Updated to filter links)
+# Testcase 7: Pangaea -> ... -> Hammer (Ran for an extremely long time) -- Algorithm struggles with 3 degrees or higher of separation
+# Testcase 8: Hammer -> Wood
+# Testcase 9: Hammer -> Wood -> Woody plant
+# Testcase 10: Hammer
+# Testcase 11: Pangaea -> Sea -> Gold -> Hammer (Found within seconds)
+# Testcase 12: Marriage -> Play (activity) -> Board game -> Hangman (game)
+
 
 
 import requests
@@ -33,6 +40,7 @@ def getLinks(title):
         "format": "json",
         "origin": "*"
     }
+
     all_links = []
     while True:
         response = requests.get(url, params=params).json()
@@ -45,10 +53,9 @@ def getLinks(title):
             params.update(response["continue"])
         else:
             break
-    filter_links = filter(all_links)
-    link_cache[title] = filter_links
-    return filter_links
-
+    filtered = filter(all_links)
+    link_cache[title] = filtered
+    return filtered
 
 def filter(links):
     ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:")
@@ -71,7 +78,7 @@ def cosineSimilarity(vec1, vec2):
     else:
         return 0
 
-def a_star_search(start, end, max_depth = 5):
+def a_star_search(start, end, max_depth = 5, top_k = 10):
     priority_queue = [(0, 0, [start])]
     goal_embedding = embed(end)
     visited = set()
@@ -89,27 +96,30 @@ def a_star_search(start, end, max_depth = 5):
         if current == end:
             return path
         
-        if cost > max_depth:
+        if cost >= max_depth:
             continue
 
         next = getLinks(current)
-
         if not next:
             continue
 
-        next_embeddings = model.encode(next)
+        vectors = model.encode(next, batch_size = 32, show_progress_bar = False)
+        scored = [(neighbor, vec, cosineSimilarity(goal_embedding, vec))
+                  for neighbor, vec in zip(next, vectors)]
+        top_neighbors = sorted(scored, key = lambda x: -x[2])[:top_k]
 
-        for neighbor, neighbor_vec in zip(next, next_embeddings):
-            if neighbor not in visited:
-                embed_cache[neighbor] = neighbor_vec
-                # Compare the goal link with the links on the page (lower is closer)
-                heuristic = 1 - cosineSimilarity(goal_embedding, neighbor_vec)
-                heapq.heappush(priority_queue, (cost + 1 + heuristic, cost + 1, path + [neighbor]))
+        for neighbor, vec, sim in top_neighbors:
+            if neighbor in visited:
+                continue
+
+            embed_cache[neighbor] = embed_cache.get(neighbor, vec)
+            h = 1 - sim
+            heapq.heappush(priority_queue, (cost + 1 + h, cost + 1, path + [neighbor]))
 
     return False
 
 if __name__ == "__main__":
-    path = a_star_search("Pangaea", "Hammer", max_depth=6)
+    path = a_star_search("Marriage", "Hangman (game)", max_depth = 6, top_k = 10)
     if path:
         print("Found Path: ")
         print(" -> ".join(path))
