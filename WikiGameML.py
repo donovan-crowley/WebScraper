@@ -15,12 +15,13 @@ Developed by Donovan Crowley
 # Testcase 10: Hammer
 # Testcase 11: Pangaea -> Sea -> Gold -> Hammer (Found within seconds)
 # Testcase 12: Marriage -> Play (activity) -> Board game -> Hangman (game)
-
-
+# Testcase 13: 
+# Testcase 14: a_star(Athletics in the 1953 Arab games, List of highways numbered 999)
 
 import requests
 from sentence_transformers import SentenceTransformer
 import heapq
+import wikipediaapi
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -58,9 +59,8 @@ def getLinks(title):
     return filtered
 
 def filter(links):
-    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:")
-    return [link for link in links if not link.startswith(ignore)]
-
+    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:", "User talk:", "Module:", "User:", "File:", "Wikipedia talk: ")
+    return[link for link in links if not link.startswith(ignore)]
 
 def embed(title):
     if title in embed_cache:
@@ -113,15 +113,25 @@ def a_star_search(start, end, max_depth = 5, top_k = 10):
                 continue
 
             embed_cache[neighbor] = embed_cache.get(neighbor, vec)
-            h = 1 - sim
-            heapq.heappush(priority_queue, (cost + 1 + h, cost + 1, path + [neighbor]))
+            heuristic = 1 - sim
+            heapq.heappush(priority_queue, (cost + 1 + heuristic, cost + 1, path + [neighbor]))
 
     return False
 
 if __name__ == "__main__":
-    path = a_star_search("Marriage", "Hangman (game)", max_depth = 6, top_k = 10)
-    if path:
-        print("Found Path: ")
-        print(" -> ".join(path))
+    start = input("Start Wikipedia title: ")
+    end = input("End Wikipedia title: ")
+
+    wiki_api = wikipediaapi.Wikipedia(user_agent = 'WikiGameML.py', language = 'en')
+    start_page = wiki_api.page(start)
+    end_page = wiki_api.page(end)
+
+    if(start_page.exists() and end_page.exists()):
+        path = a_star_search(start, end, max_depth = 6, top_k = 10)
+        if path:
+            print("Found Path: ")
+            print(" -> ".join(path))
+        else:
+            print("No path found.")
     else:
-        print("No path found.")
+        print("Error fetching Wikipedia page. Please check existence and spelling of both pages")
