@@ -15,13 +15,17 @@ Developed by Donovan Crowley
 # Testcase 10: Hammer
 # Testcase 11: Pangaea -> Sea -> Gold -> Hammer (Found within seconds)
 # Testcase 12: Marriage -> Play (activity) -> Board game -> Hangman (game)
-# Testcase 13: 
-# Testcase 14: a_star(Athletics in the 1953 Arab games, List of highways numbered 999)
+# Testcase 13: Athletics at the 1953 Arab Games -> Alexandria -> Cairo–Alexandria desert road (~4.78s) - be careful with the dash
+# Testcase 14: Athletics at the 1953 Arab Games -> Alexandria -> Cairo–Alexandria desert road -> Highway (~46.92s)
+# Testcase 15: Athletics at the 1953 Arab Games -> 100 metres -> Indianapolis -> Interstate Highway System -> State highway (~3 minutes 34.6 seconds)
+# Testcase 16: Athletics at the 1953 Arab Games -> 100 metres -> Edmonton -> Alberta Highway 16 -> Saskatchewan Highway 1 -> Saskatchewan Highway 999 (~6 minutes 40.66 seconds)
+# Testcase 17: Athletics at the 1953 Arab Games -> Marathon -> Street racing -> Controlled-access highway -> Numbered highways in Canada -> Saskatchewan Highway 999 -> List of highways numbered 999 (~17 minutes 16.01 second)
 
 import requests
 from sentence_transformers import SentenceTransformer
 import heapq
 import wikipediaapi
+import time
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -59,8 +63,12 @@ def getLinks(title):
     return filtered
 
 def filter(links):
-    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:", "User talk:", "Module:", "User:", "File:", "Wikipedia talk: ")
-    return[link for link in links if not link.startswith(ignore)]
+    ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:", "User talk:", "Module:", "User:", "File:", "Wikipedia talk: ", "Template talk:")
+    filteredLinks = []
+    for link in links:
+        if not link.startswith(ignore):
+            filteredLinks.append(link)
+    return filteredLinks
 
 def embed(title):
     if title in embed_cache:
@@ -104,9 +112,12 @@ def a_star_search(start, end, max_depth = 5, top_k = 10):
             continue
 
         vectors = model.encode(next, batch_size = 32, show_progress_bar = False)
-        scored = [(neighbor, vec, cosineSimilarity(goal_embedding, vec))
-                  for neighbor, vec in zip(next, vectors)]
-        top_neighbors = sorted(scored, key = lambda x: -x[2])[:top_k]
+        scored = []
+        for neighbor, vec in zip(next, vectors):
+            sim = cosineSimilarity(goal_embedding, vec)
+            scored.append((neighbor, vec, sim))
+        scored.sort(key = lambda x: -x[2])
+        top_neighbors = scored[:top_k]
 
         for neighbor, vec, sim in top_neighbors:
             if neighbor in visited:
@@ -119,18 +130,23 @@ def a_star_search(start, end, max_depth = 5, top_k = 10):
     return False
 
 if __name__ == "__main__":
-    start = input("Start Wikipedia title: ")
-    end = input("End Wikipedia title: ")
+    start = input("Start Wiki page title: ")
+    end = input("End Wiki page title: ")
 
     wiki_api = wikipediaapi.Wikipedia(user_agent = 'WikiGameML.py', language = 'en')
     start_page = wiki_api.page(start)
     end_page = wiki_api.page(end)
+    
+    start_time = time.time()
 
     if(start_page.exists() and end_page.exists()):
         path = a_star_search(start, end, max_depth = 6, top_k = 10)
         if path:
             print("Found Path: ")
             print(" -> ".join(path))
+            end_time = time.time()
+            difference = end_time - start_time
+            print(f"Found in {difference:.2f} seconds")
         else:
             print("No path found.")
     else:
