@@ -33,6 +33,7 @@ embed_cache = {}
 link_cache = {}
 
 def getLinks(title):
+    # Prevent multiple Wikipedia API fetches
     if title in link_cache:
         return link_cache[title]
 
@@ -54,6 +55,7 @@ def getLinks(title):
             links = pages[page_id].get('links', [])
             all_links.extend(link['title'] for link in links)
         
+        # Ensure all links are fetched from page (not first 500)
         if "continue" in response:
             params.update(response["continue"])
         else:
@@ -63,6 +65,7 @@ def getLinks(title):
     return filtered
 
 def filter(links):
+    # Ignore links with prefixes to unhelpful paths
     ignore = ("Wikipedia:", "Help:", "Category:", "Talk:", "Portal:", "Template:", "User talk:", "Module:", "User:", "File:", "Wikipedia talk: ", "Template talk:", "MOS:")
     filteredLinks = []
     for link in links:
@@ -71,6 +74,7 @@ def filter(links):
     return filteredLinks
 
 def embed(title):
+    # Prevent multiple searches in SentenceTransformer embedding
     if title in embed_cache:
         return embed_cache[title]
     vec = model.encode([title])[0]
