@@ -4,7 +4,7 @@
 const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
 
-const WEATHERHOME_URL = "https://weather.com/weather/tenday/l/6594bd988ad8d62279951252d2be55f03043bee93ced5605230072de15a4c00e";
+const WEATHERHOME_URL = "https://weather.com/us/california/city/san-francisco/tenday";
 const QUOTE_URL = "https://inspiringquotes.com/";
 
 (async () =>{
